@@ -20,80 +20,61 @@ import java.util.List;
 @EventBusSubscriber(modid = UmaRace.MODID, value = Dist.CLIENT)
 public class ClientForgeEvents {
     private static final float TRACK_WIDTH = 18.0f;
-    // 定义8个方向的单位向量
     private static final List<Vec3> AXIS_DIRECTIONS = List.of(
             new Vec3(1, 0, 0), new Vec3(-1, 0, 0),
             new Vec3(0, 0, 1), new Vec3(0, 0, -1),
             new Vec3(1, 0, 1).normalize(), new Vec3(1, 0, -1).normalize(),
             new Vec3(-1, 0, 1).normalize(), new Vec3(-1, 0, -1).normalize()
     );
-
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
-        // ... (initial checks for stage, player, item remain the same)
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
         Player player = Minecraft.getInstance().player;
         if (player == null || !player.isHolding(UmaRace.TRACK_WAND.get())) return;
-
         TrackCreationManager tcm = TrackCreationManager.getInstance();
-        List<Vec3> controlPoints = tcm.getControlPoints(player);
+        List<Vec3> controlPoints = tcm.getPointsToRender(player);
         if (controlPoints.isEmpty()) return;
-
-        // ... (setup poseStack, bufferSource, etc. remain the same)
         PoseStack poseStack = event.getPoseStack();
         MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
         VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.lines());
         Vec3 camPos = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-
         poseStack.pushPose();
         poseStack.translate(-camPos.x(), -camPos.y(), -camPos.z());
         PoseStack.Pose pose = poseStack.last();
-
-        // --- 引导线渲染: 当玩家已选择1个点时 ---
         if (controlPoints.size() == 1) {
             Vec3 p1 = controlPoints.get(0);
-            float guideLineLength = 128.0f; // 引导线长度
+            float guideLineLength = 128.0f;
             for (Vec3 dir : AXIS_DIRECTIONS) {
                 Vec3 end = p1.add(dir.scale(guideLineLength));
-                drawLine(vertexConsumer, pose, p1, end, 0.5f, 0.5f, 0.5f, 0.4f); // 灰色半透明
+                drawLine(vertexConsumer, pose, p1, end, 0.5f, 0.5f, 0.5f, 0.4f);
             }
         }
-
-        // 渲染已选择的控制点
         for (int i = 0; i < controlPoints.size(); i++) {
             float r = (i == 0) ? 0.0f : 1.0f;
             float g = (i == 1) ? 1.0f : 0.5f;
             float b = (i == 2) ? 1.0f : 0.0f;
             drawBox(vertexConsumer, pose, controlPoints.get(i), 0.3f, r, g, b, 1.0f);
         }
-
-        // 如果2个点已选好，渲染它们之间的直线
         if (controlPoints.size() == 2) {
             drawLine(vertexConsumer, pose, controlPoints.get(0), controlPoints.get(1), 1.0f, 1.0f, 0.0f, 1.0f);
         }
-
-        // 如果3个点都选好了，渲染完整赛道范围
         if (controlPoints.size() == 3) {
             List<Vec3> centerWaypoints = tcm.generateStadiumWaypoints(controlPoints);
             if (!centerWaypoints.isEmpty()) {
-                // ... (The track rendering logic is identical to the previous version)
                 for (int i = 0; i < centerWaypoints.size(); i++) {
                     Vec3 p1 = centerWaypoints.get(i);
                     Vec3 p2 = centerWaypoints.get((i + 1) % centerWaypoints.size());
                     Vec3 tangent = p2.subtract(p1).normalize();
                     Vec3 normal = tangent.cross(new Vec3(0, 1, 0)).normalize().scale(TRACK_WIDTH / 2.0);
-
                     Vec3 p1_inner = p1.subtract(normal);
                     Vec3 p2_inner = p2.subtract(normal);
                     Vec3 p1_outer = p1.add(normal);
                     Vec3 p2_outer = p2.add(normal);
-
                     drawLine(vertexConsumer, pose, p1_inner, p2_inner, 1.0f, 1.0f, 1.0f, 0.8f);
                     drawLine(vertexConsumer, pose, p1_outer, p2_outer, 1.0f, 1.0f, 1.0f, 0.8f);
                 }
             }
         }
-
         poseStack.popPose();
         bufferSource.endBatch(RenderType.lines());
     }
