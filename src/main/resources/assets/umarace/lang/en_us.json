@@ -1,0 +1,13 @@
+{
+  "itemGroup.umarace": "Example Mod Tab",
+  "block.umarace.example_block": "Example Block",
+  "item.umarace.example_item": "Example Item",
+
+  "umarace.configuration.title": "UmaRace Configs",
+  "umarace.configuration.section.umarace.common.toml": "UmaRace Configs",
+  "umarace.configuration.section.umarace.common.toml.title": "UmaRace Configs",
+  "umarace.configuration.items": "Item List",
+  "umarace.configuration.logDirtBlock": "Log Dirt Block",
+  "umarace.configuration.magicNumberIntroduction": "Magic Number Text",
+  "umarace.configuration.magicNumber": "Magic Number"
+}
