@@ -1,4 +1,6 @@
 package moe.gensoukyo.umarace.item;
+
+import moe.gensoukyo.umarace.manager.TrackCreationManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
@@ -6,6 +8,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+
 public class TrackWandItem extends Item {
     public TrackWandItem(Properties properties) {
         super(properties);
@@ -14,20 +18,39 @@ public class TrackWandItem extends Item {
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
-        if (!level.isClientSide()) {
-            Player player = context.getPlayer();
-            if (player == null) {
-                return InteractionResult.FAIL;
-            }
-            if (player.isShiftKeyDown()) {
-                player.sendSystemMessage(Component.literal("赛道定义完成！(未来将在此保存数据)"));
-            } else {
-                BlockPos clickedPos = context.getClickedPos();
-                BlockPos waypointPos = clickedPos.above();
-                player.sendSystemMessage(Component.literal(String.format("路径点已添加: %d, %d, %d", waypointPos.getX(), waypointPos.getY(), waypointPos.getZ())));
-            }
+        Player player = context.getPlayer();
+
+        if (player == null || level.isClientSide()) {
+            return InteractionResult.PASS;
+        }
+
+        if (player.isShiftKeyDown()) {
+            player.sendSystemMessage(Component.literal("请使用 /track save <name> 或 /track clear 来管理赛道。"));
             return InteractionResult.SUCCESS;
         }
-        return super.useOn(context);
+
+        TrackCreationManager tcm = TrackCreationManager.getInstance();
+
+        // 【关键修正】
+        // 先获取点击位置的上方一格的 BlockPos，然后再转换为 Vec3
+        BlockPos clickedPos = context.getClickedPos();
+        Vec3 waypoint = Vec3.atCenterOf(clickedPos.above());
+
+        tcm.addControlPoint(player, waypoint); // addControlPoint 会处理对齐逻辑
+
+        int count = tcm.getControlPoints(player).size();
+        player.sendSystemMessage(Component.literal(String.format("体育场赛道: 已设置内侧边缘控制点 %d/3.", count)));
+
+        if (count == 1) {
+            player.sendSystemMessage(Component.literal("提示: 第1点为内侧直道起点. 请沿引导线方向点击第2点."));
+        } else if (count == 2) {
+            player.sendSystemMessage(Component.literal("提示: 第2点已自动对齐为直线终点. 请点击第3点确定弯道方向."));
+        } else if (count == 3) {
+            player.sendSystemMessage(Component.literal("提示: 第3点为内侧弯道顶点. 赛道范围已显示!"));
+            player.sendSystemMessage(Component.literal("再次点击将重置控制点."));
+            player.sendSystemMessage(Component.literal("使用 /track save <name> 保存赛道."));
+        }
+
+        return InteractionResult.SUCCESS;
     }
 }

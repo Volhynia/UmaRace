@@ -1,4 +1,5 @@
-package moe.gensoukyo.umarace;
+package moe.gensoukyo.umarace.client;
+import moe.gensoukyo.umarace.UmaRace;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
