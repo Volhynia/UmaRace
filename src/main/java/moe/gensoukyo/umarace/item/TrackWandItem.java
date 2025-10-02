@@ -10,6 +10,7 @@ public class TrackWandItem extends Item {
     public TrackWandItem(Properties properties) {
         super(properties);
     }
+
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
