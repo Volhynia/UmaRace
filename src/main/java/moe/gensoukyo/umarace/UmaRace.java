@@ -1,7 +1,8 @@
 package moe.gensoukyo.umarace;
 import com.mojang.logging.LogUtils;
 import moe.gensoukyo.umarace.command.TrackCommand;
-import moe.gensoukyo.umarace.item.TrackWandItem; 
+import moe.gensoukyo.umarace.item.TrackWandItem;
+import moe.gensoukyo.umarace.network.PacketHandler;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.slf4j.Logger;
@@ -27,6 +28,8 @@ public class UmaRace {
     public UmaRace(IEventBus modEventBus, ModContainer modContainer) {
         modEventBus.addListener(this::commonSetup);
         ITEMS.register(modEventBus);
+        // The PacketHandler is now an EventBusSubscriber, so it registers itself automatically.
+        // We no longer need to manually register it to the event bus here if we add the annotation to it.
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
         modEventBus.addListener(this::addCreative);
@@ -34,6 +37,8 @@ public class UmaRace {
     }
     private void commonSetup(FMLCommonSetupEvent event) {
         LOGGER.info("UmaRace Mod is setting up!");
+        // We no longer need to call a register method here.
+        // event.enqueueWork(PacketHandler::register); // REMOVE THIS LINE
     }
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {

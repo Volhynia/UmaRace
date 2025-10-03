@@ -34,7 +34,7 @@ public class TrackCommand {
                 source.sendFailure(Component.literal("错误: 无效的控制点，无法生成赛道 (例如半径过小或点重合)。"));
                 return 0;
             }
-            tcm.generateIceFloor(player.serverLevel(), controlPoints);
+            // tcm.generateIceFloor(player.serverLevel(), controlPoints); // REMOVED
             TrackData trackData = TrackData.get(player.serverLevel());
             trackData.addTrack(name, waypoints);
             tcm.archiveTemporaryPoints(player);

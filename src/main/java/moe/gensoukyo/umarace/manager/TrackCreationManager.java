@@ -1,8 +1,9 @@
 package moe.gensoukyo.umarace.manager;
+import moe.gensoukyo.umarace.network.PacketHandler;
+import moe.gensoukyo.umarace.network.packet.SyncControlPointsPacket;
 import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +37,7 @@ public class TrackCreationManager {
                 points.add(point);
                 break;
         }
+        syncControlPointsWithClient(player);
     }
     private Vec3 snapPointToAxis(Vec3 p1, Vec3 rawP2) {
         Vec3 delta = rawP2.subtract(p1);
@@ -68,12 +70,21 @@ public class TrackCreationManager {
     }
     public List<Vec3> clearAndGetControlPoints(Player player) {
         lastSavedControlPoints.remove(player.getUUID());
-        return temporaryControlPoints.remove(player.getUUID());
+        List<Vec3> removed = temporaryControlPoints.remove(player.getUUID());
+        syncControlPointsWithClient(player);
+        return removed;
     }
     public void archiveTemporaryPoints(Player player) {
         List<Vec3> points = temporaryControlPoints.remove(player.getUUID());
         if (points != null && !points.isEmpty()) {
             lastSavedControlPoints.put(player.getUUID(), points);
+        }
+        syncControlPointsWithClient(player);
+    }
+    private void syncControlPointsWithClient(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            List<Vec3> pointsToSync = getPointsToRender(player);
+            PacketHandler.sendToPlayer(serverPlayer, new SyncControlPointsPacket(pointsToSync));
         }
     }
     public List<Vec3> generateStadiumWaypoints(List<Vec3> controlPoints) {
@@ -132,75 +143,5 @@ public class TrackCreationManager {
             waypoints.add(pointOnCurve);
         }
         return waypoints;
-    }
-    public void generateIceFloor(ServerLevel level, List<Vec3> controlPoints) {
-        if (controlPoints.size() != 3) {
-            return;
-        }
-        Vec3 p1_inner = controlPoints.get(0);
-        Vec3 p2_inner = controlPoints.get(1);
-        Vec3 p3_inner = controlPoints.get(2);
-        double baseY = p1_inner.y;
-        Vec3 p1_inner_flat = new Vec3(p1_inner.x, baseY, p1_inner.z);
-        Vec3 p2_inner_flat = new Vec3(p2_inner.x, baseY, p2_inner.z);
-        Vec3 p3_inner_flat = new Vec3(p3_inner.x, baseY, p3_inner.z);
-        Vec3 straightVec = p2_inner_flat.subtract(p1_inner_flat);
-        if (straightVec.lengthSqr() < 1e-6) return;
-        Vec3 straightDir = straightVec.normalize();
-        double straightLen = straightVec.length();
-        Vec3 rightDir = straightDir.cross(new Vec3(0, 1, 0)).normalize();
-        Vec3 p2_to_p3 = p3_inner_flat.subtract(p2_inner_flat);
-        Vec3 insideNormal = rightDir.scale(Math.signum(p2_to_p3.dot(rightDir)));
-        double radius_inner = Math.abs(p2_to_p3.dot(rightDir));
-        if (radius_inner < 1.0) return;
-        double radius_outer = radius_inner + TRACK_WIDTH;
-        Vec3 c1_inner = p2_inner_flat.add(insideNormal.scale(radius_inner));
-        Vec3 c2_inner = p1_inner_flat.add(insideNormal.scale(radius_inner));
-        Vec3 p_start_straight_2_inner = p2_inner_flat.add(insideNormal.scale(radius_inner * 2));
-        Set<BlockPos> blocksToChange = new HashSet<>();
-        int y = (int) Math.floor(baseY - 1.0);
-        final double step = 0.5;
-        for (double d = 0; d <= straightLen; d += step) {
-            Vec3 linePoint = p1_inner_flat.add(straightDir.scale(d));
-            for (double w = 0; w < TRACK_WIDTH; w += step) {
-                Vec3 blockVec = linePoint.subtract(insideNormal.scale(w));
-                blocksToChange.add(BlockPos.containing(blockVec.x, y, blockVec.z));
-            }
-        }
-        for (double d = 0; d <= straightLen; d += step) {
-            Vec3 linePoint = p_start_straight_2_inner.add(straightDir.scale(-d));
-            for (double w = 0; w < TRACK_WIDTH; w += step) {
-                Vec3 blockVec = linePoint.add(insideNormal.scale(w));
-                blocksToChange.add(BlockPos.containing(blockVec.x, y, blockVec.z));
-            }
-        }
-        Vec3 u_axis = straightDir;
-        Vec3 v_axis = insideNormal;
-        double r_outer_int = Math.ceil(radius_outer);
-        for (double du = -r_outer_int; du <= r_outer_int; du += step) {
-            for (double dv = -r_outer_int; dv <= r_outer_int; dv += step) {
-                double distSq = du * du + dv * dv;
-                if (distSq >= radius_inner * radius_inner && distSq < radius_outer * radius_outer) {
-                    Vec3 currentPoint = c1_inner.add(u_axis.scale(du)).add(v_axis.scale(dv));
-                    if (currentPoint.subtract(p2_inner_flat).dot(u_axis) >= -0.5) {
-                        blocksToChange.add(BlockPos.containing(currentPoint.x, y, currentPoint.z));
-                    }
-                }
-            }
-        }
-        for (double du = -r_outer_int; du <= r_outer_int; du += step) {
-            for (double dv = -r_outer_int; dv <= r_outer_int; dv += step) {
-                double distSq = du * du + dv * dv;
-                if (distSq >= radius_inner * radius_inner && distSq < radius_outer * radius_outer) {
-                    Vec3 currentPoint = c2_inner.add(u_axis.scale(du)).add(v_axis.scale(dv));
-                    if (currentPoint.subtract(p1_inner_flat).dot(u_axis) <= 0.5) {
-                        blocksToChange.add(BlockPos.containing(currentPoint.x, y, currentPoint.z));
-                    }
-                }
-            }
-        }
-        for (BlockPos pos : blocksToChange) {
-            level.setBlock(pos, Blocks.ICE.defaultBlockState(), 3);
-        }
     }
 }

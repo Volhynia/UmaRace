@@ -31,8 +31,11 @@ public class ClientForgeEvents {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return;
         Player player = Minecraft.getInstance().player;
         if (player == null || !player.isHolding(UmaRace.TRACK_WAND.get())) return;
-        TrackCreationManager tcm = TrackCreationManager.getInstance();
-        List<Vec3> controlPoints = tcm.getPointsToRender(player);
+
+        // Use the client-side data cache instead of the server-side manager
+        ClientTrackCreationData ctd = ClientTrackCreationData.getInstance();
+        List<Vec3> controlPoints = ctd.getPointsToRender();
+
         if (controlPoints.isEmpty()) return;
         PoseStack poseStack = event.getPoseStack();
         MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
@@ -59,6 +62,11 @@ public class ClientForgeEvents {
             drawLine(vertexConsumer, pose, controlPoints.get(0), controlPoints.get(1), 1.0f, 1.0f, 0.0f, 1.0f);
         }
         if (controlPoints.size() == 3) {
+            // We need to re-calculate the waypoints on the client for rendering
+            // For this, we can make generateStadiumWaypoints public and accessible
+            // Or better, we can copy a simplified version if it becomes complex
+            // For now, let's assume direct access for simplicity.
+            TrackCreationManager tcm = TrackCreationManager.getInstance();
             List<Vec3> centerWaypoints = tcm.generateStadiumWaypoints(controlPoints);
             if (!centerWaypoints.isEmpty()) {
                 for (int i = 0; i < centerWaypoints.size(); i++) {
